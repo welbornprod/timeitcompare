@@ -5,7 +5,7 @@
 
 # -Christopher Welborn 07-05-2015
 appname="timeit-compare"
-appversion="0.2.0"
+appversion="0.2.1"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
@@ -44,7 +44,7 @@ function read_stdin {
     while read -r line
     do
         echo "$line"
-    done < /dev/stdin
+    done
     IFS="$saveifs"
 }
 
@@ -53,26 +53,21 @@ function time_code {
     # Arguments:
     #     $1 : Executable name.
     #     $2 : Code snippet.
-    echo "    Timing: $(trim_text "$2")"
+    #     $3 : Optional display name for this snippet.
+    #          Default: Trimmed code snippet text.
+    if [[ -n "$3" ]]; then
+        echo "    Timing: $3"
+    else
+        echo "    Timing: $(trim_text "$2")"
+    fi
     printf "        %s\n\n" "$("$1" -m timeit "${timeitargs[@]}" -- "$2")"
 }
 
-function time_file {
-    # Time code from a file using a specific executable.
-    # Arguments:
-    #     $1 : Executable name.
-    #     $2 : File name.
-    echo "    Timing: $2"
-    printf "        %s\n\n" "$("$1" -m timeit "${timeitargs[@]}" -- "$(<"$2")")"
-}
-
 function trim_text {
-    # Trim everything but the first line.
-    # Trim again if it's over 40 characters
-    # Add '...' if either happen.
+    # Output the first line of some text (up to 40 characters).
+    # Add '...' if the text was trimmed.
     local firstline="${1%%$'\n'*}"
-    local len=$((${#firstline}))
-    if [[ $len -gt 40 ]] || [[ "$1" != "$firstline" ]]; then
+    if (( ${#firstline} > 40 )) || [[ "$1" != "$firstline" ]]; then
         echo "${firstline:0:40} ..."
     else
         echo "$firstline"
@@ -128,7 +123,7 @@ fi
 if [[ $force_stdin == true ]] || [[ (( ${#snippets} == 0 )) && (( ${#filenames} == 0 )) ]]; then
     [[ -t 0 ]] && echo -e "Reading lines from stdin until EOF (Ctrl + D)...\n"
     snippets=("${snippets[@]}" "$(read_stdin)")
-    # Stdin may not have produced any snippets.
+    # Stdin may not have produced any valid snippets.
     if (( ${#snippets} == 0 )) && (( ${#filenames} == 0 )); then
         print_usage "No code to test!"
         exit 1
@@ -143,7 +138,7 @@ do
     # Read any files passed in.
     for fname in "${filenames[@]}"
     do
-        time_file "$exename" "$fname"
+        time_code "$exename" "$(<"$fname")" "$fname"
     done
     # Use any snippets passed in.
     for code in "${snippets[@]}"
