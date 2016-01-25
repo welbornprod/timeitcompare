@@ -89,3 +89,9 @@ Example of mixing files, snippets, and stdin.
 ```
 echo "map(str, range(5))" | timeitcompare "(str(c) for c in range(5))" - snippet.py
 ```
+
+Notes:
+------
+
+Any interpreter that supports calling timeit with `-m timeit` can be used
+(`pypy`, `jython`).
