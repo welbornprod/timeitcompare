@@ -26,6 +26,20 @@ Options:
     -v,--version      : Show version and exit.
 ```
 
+Installation:
+-------------
+
+Just symlink `timeitcomp.sh` to somewhere in `$PATH`:
+```
+cd timeitcompare
+ln -s "$PWD/timeitcomp.sh" ~/.local/bin/timeitcomp
+```
+
+`colr.sh` should be placed in the same directory as `timeitcomp.sh`, no matter
+where you place the symlink. The script will continue to work
+(with no colors) without `colr.sh` though.
+
+
 Usage Examples:
 ---------------
 
