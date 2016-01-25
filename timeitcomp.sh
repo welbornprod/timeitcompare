@@ -16,7 +16,7 @@ else
 fi
 
 appname="timeit-compare"
-appversion="0.2.2"
+appversion="0.2.3"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
@@ -78,7 +78,7 @@ function time_code {
         echo "    Timing: $(colr "$(trim_text "$2")" "green")"
     fi
     if ! output="$("$1" -m timeit "${timeitargs[@]}" -- "$2" 2>&1)"; then
-        printf "        %s\n\n" "$(colr "$output" "red")"
+        printf "        %s\n\n" "$(colr "$output" "red")" 1>&2
         return 1
     fi
     printf "        %s\n\n" "$(colr "$output" "blue")"
@@ -121,10 +121,10 @@ do
     elif [[ "$arg" =~ ^(-e)|(--exe)= ]]; then
         exeargname="${arg##*=}"
         if [[ -z "$exeargname" ]] || [[ "$exeargname" =~ ^(-e)|(--exe)$ ]]; then
-            print_usage "Invalid executable arg: $arg"
+            print_usage "Invalid executable arg: $arg\n    Expecting: -e=executable"
             exit 1
         elif ! which "$exeargname" &>/dev/null; then
-            echo "Not a valid executable: $exeargname"
+            echo -e "\nNot a valid executable: $exeargname" 2>&1
             exit 1
         else
             exenames=("${exenames[@]}" "$exeargname")
