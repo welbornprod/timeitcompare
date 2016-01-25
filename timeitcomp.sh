@@ -4,24 +4,39 @@
 # It will also do a single timeit run.
 
 # -Christopher Welborn 07-05-2015
+apppath="$(readlink -f "${BASH_SOURCE[0]}")"
+appdir="${apppath%/*}"
+
+if [[ -f "$appdir/colr.sh" ]]; then
+    source "$appdir/colr.sh"
+else
+    function colr {
+        echo -n "$1"
+    }
+fi
+
 appname="timeit-compare"
-appversion="0.2.1"
+appversion="0.2.2"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
 # Default python to use.
 default_exename="python3"
+
+
 function print_usage {
-    # Show usage reason if first arg is available.
+    # Print a 'reason' for showing the usage.
     [[ -n "$1" ]] && echo -e "\n$1\n"
+    # shellcheck disable=SC2154
+    echo "${fore[lightblue]}${style[bright]}$appname v. $appversion${style[reset]}
 
-    echo "$appname v. $appversion
-
-    Usage:
+    Usage:${fore[lightmagenta]}
         $appscript -h | -v
-        $appscript [-e=executable...] [CODE...] [-- ARGS...]
-
-    Options:
+        $appscript [-e=executable...] [CODE...] [-- ARGS...]${style[reset]}"
+    # Print full usage when no reason-arg is given.
+    if [[ -z "$1" ]]; then
+        echo "
+    Options:${fore[lightgreen]}
         CODE              : One or more code snippets to compare.
                             If no snippets are given, input is read from stdin.
                             You can force reading from stdin by passing -.
@@ -33,7 +48,8 @@ function print_usage {
                             All code snippets will be used once per executable.
         -h,--help         : Show this message and exit.
         -v,--version      : Show version and exit.
-    "
+    ${style[reset]}"
+    fi
 }
 
 function read_stdin {
@@ -56,11 +72,15 @@ function time_code {
     #     $3 : Optional display name for this snippet.
     #          Default: Trimmed code snippet text.
     if [[ -n "$3" ]]; then
-        echo "    Timing: $3"
+        echo "    Timing: $(colr "$3" "green")"
     else
-        echo "    Timing: $(trim_text "$2")"
+        echo "    Timing: $(colr "$(trim_text "$2")" "green")"
     fi
-    printf "        %s\n\n" "$("$1" -m timeit "${timeitargs[@]}" -- "$2")"
+    if ! output="$("$1" -m timeit "${timeitargs[@]}" -- "$2" 2>&1)"; then
+        printf "        %s\n\n" "$(colr "$output" "red")"
+        return 1
+    fi
+    printf "        %s\n\n" "$(colr "$output" "blue")"
 }
 
 function trim_text {
@@ -78,19 +98,19 @@ declare -a exenames
 declare -a filenames
 declare -a snippets
 declare -a timeitargs
-force_stdin=false
-in_args=false
+force_stdin=0
+in_args=0
 for arg
 do
-    if [[ $in_args == true ]]; then
+    if (( in_args )); then
         # Build timeit args.
         timeitargs=("${timeitargs[@]}" "$arg")
     elif [[ "$arg" == "--" ]]; then
         # All other args will be treated as timeit args.
-        in_args=true
+        in_args=1
     elif [[ "$arg" == "-" ]]; then
         # Stdin will be used.
-        force_stdin=true
+        force_stdin=1
     elif [[ "$arg" =~ ^(-h)|(--help)$ ]]; then
         print_usage ""
         exit 0
@@ -101,6 +121,10 @@ do
         exeargname="${arg##*=}"
         if [[ -z "$exeargname" ]] || [[ "$exeargname" =~ ^(-e)|(--exe)$ ]]; then
             print_usage "Invalid executable arg: $arg"
+            exit 1
+        elif ! which "$exeargname" &>/dev/null; then
+            echo "Not a valid executable: $exeargname"
+            exit 1
         else
             exenames=("${exenames[@]}" "$exeargname")
         fi
@@ -118,10 +142,10 @@ done
 if (( ${#exenames[@]} == 0 )); then
     exenames=("$default_exename")
 fi
-
+do_stdin=$(( ${#snippets[@]} == 0 && ${#filenames[@]} == 0 ))
 # Use stdin if forced, or if no snippets or file names have been passed.
-if [[ $force_stdin == true ]] || [[ (( ${#snippets} == 0 )) && (( ${#filenames} == 0 )) ]]; then
-    [[ -t 0 ]] && echo -e "Reading lines from stdin until EOF (Ctrl + D)...\n"
+if (( force_stdin || do_stdin )); then
+    ([[ -t 0 ]] && [[ -t 1 ]]) && echo -e "Reading lines from stdin until EOF (Ctrl + D)...\n"
     snippets=("${snippets[@]}" "$(read_stdin)")
     # Stdin may not have produced any valid snippets.
     if (( ${#snippets} == 0 )) && (( ${#filenames} == 0 )); then
@@ -134,15 +158,21 @@ fi
 # Run timeit for each snippet, once per executable.
 for exename in "${exenames[@]}"
 do
-    printf "\nUsing: %s %s\n" "$exename" "$(trim_text "${timeitargs[*]}")"
+    exenamefmt="$(colr "$exename" "red")"
+    timeitargsfmt="$(colr "$(trim_text "${timeitargs[*]}")" "magenta")"
+    printf "\nUsing: %s %s\n" "$exenamefmt" "$timeitargsfmt"
     # Read any files passed in.
     for fname in "${filenames[@]}"
     do
-        time_code "$exename" "$(<"$fname")" "$fname"
+        if ! time_code "$exename" "$(<"$fname")" "$fname"; then
+            exit 1
+        fi
     done
     # Use any snippets passed in.
     for code in "${snippets[@]}"
     do
-        time_code "$exename" "$code"
+        if ! time_code "$exename" "$code"; then
+            exit 1
+        fi
     done
 done
