@@ -18,6 +18,7 @@ Options:
                         If a file name is given, it will be read and used.
     ARGS              : Extra arguments for timeit.
                         Must be last, and come after the -- separator.
+                        This is where --setup can be passed.
     -e=exe,--exe=exe  : Executable to use. [Default: python3]
                         This flag can be set multiple times.
                         All code snippets will be used once per executable.
