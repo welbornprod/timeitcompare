@@ -16,7 +16,7 @@ else
 fi
 
 appname="Timeit-Compare"
-appversion="0.3.0"
+appversion="0.3.1"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
@@ -66,28 +66,30 @@ function print_usage {
 
     Usage:${fore[lightmagenta]}
         $appscript -h | -v
-        $appscript [-e=executable...] [-o] [CODE...] [-- ARGS...]${style[reset]}"
+        $appscript [-e=executable...] [-o] [-s code...] [CODE...] [-- ARGS...]${style[reset]}"
     # Print full usage when no reason-arg is given.
     if [[ -z "$1" ]]; then
         echo "
     Options:${fore[lightgreen]}
-        CODE              : One or more code snippets to compare.
-                            If no snippets are given, input is read from stdin.
-                            You can force reading from stdin by passing -.
-                            If a file name is given, it will be read and used.
-        ARGS              : Extra arguments for timeit.
-                            Must be last, and come after the -- separator.
-                            This is where --setup can be passed.
-        -e=exe,--exe=exe  : Executable to use. Default: $default_exename
-                            This flag can be set multiple times.
-                            All code snippets will be used once per executable.
-        -h,--help         : Show this message and exit.
-        -o,--overhead     : Account for some of the overhead of using timeit
-                            to run these snippets.
-                            Times the execution of a simple 'pass' statement
-                            for each executable, and subtracts that from
-                            each snippet's run time.
-        -v,--version      : Show version and exit.
+        CODE                  : One or more code snippets to compare.
+                                If a file name is given, it will be read.
+                                You can force reading from stdin by passing -.
+                                Default: stdin
+        ARGS                  : Extra arguments for timeit.
+                                Must be last, and come after the -- separator.
+        -e=exe,--exe=exe      : Executable to use. This flag can be set
+                                multiple times. All code snippets will be used
+                                once per executable.
+                                Default: $default_exename
+        -h,--help             : Show this message and exit.
+        -o,--overhead         : Account for some of the overhead of using
+                                timeit to run these snippets.
+                                Times the execution of a simple 'pass'
+                                statement for each executable, and subtracts
+                                that from each snippet's run time.
+        -s code,--setup code  : Setup code for timeit (same as timeit -s).
+                                Can be used multiple times.
+        -v,--version          : Show version and exit.
     ${style[reset]}"
     fi
 }
@@ -155,14 +157,19 @@ declare -a filenames
 declare -a snippets
 declare -a timeitargs
 force_stdin=0
-in_args=0
 use_overhead=0
+in_args=0
+in_setup=0
 
 for arg
 do
     if (( in_args )); then
         # Build timeit args.
         timeitargs=("${timeitargs[@]}" "$arg")
+    elif (( in_setup )); then
+        # -s flag was passed early, grab this for setup.
+        timeitargs=("${timeitargs[@]}" "$arg")
+        in_setup=0
     elif [[ "$arg" == "--" ]]; then
         # All other args will be treated as timeit args.
         in_args=1
@@ -174,6 +181,9 @@ do
         exit 0
     elif [[ "$arg" =~ ^(-o)|(--overhead)$ ]]; then
         use_overhead=1
+    elif [[ "$arg" =~ ^(-s)|(--setup)$ ]]; then
+        timeitargs=("${timeitargs[@]}" "-s")
+        in_setup=1
     elif [[ "$arg" =~ ^(-v)|(--version)$ ]]; then
         echo -e "$appname v. $appversion\n"
         exit 0

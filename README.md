@@ -8,22 +8,29 @@ Command Line Help:
 ------------------
 ```
 Usage:
-    timeitcomp -h | -v
-    timeitcomp [-e=executable...] [CODE...] [-- ARGS...]
+    timeitcomp.sh -h | -v
+    timeitcomp.sh [-e=executable...] [-o] [-s code...] [CODE...] [-- ARGS...]
 
 Options:
-    CODE              : One or more code snippets to compare.
-                        If no snippets are given, input is read from stdin.
-                        You can force reading from stdin by passing -.
-                        If a file name is given, it will be read and used.
-    ARGS              : Extra arguments for timeit.
-                        Must be last, and come after the -- separator.
-                        This is where --setup can be passed.
-    -e=exe,--exe=exe  : Executable to use. Default: python3
-                        This flag can be set multiple times.
-                        All code snippets will be used once per executable.
-    -h,--help         : Show this message and exit.
-    -v,--version      : Show version and exit.
+    CODE                  : One or more code snippets to compare.
+                            If a file name is given, it will be read.
+                            You can force reading from stdin by passing -.
+                            Default: stdin
+    ARGS                  : Extra arguments for timeit.
+                            Must be last, and come after the -- separator.
+    -e=exe,--exe=exe      : Executable to use. This flag can be set
+                            multiple times. All code snippets will be used
+                            once per executable.
+                            Default: python3
+    -h,--help             : Show this message and exit.
+    -o,--overhead         : Account for some of the overhead of using
+                            timeit to run these snippets.
+                            Times the execution of a simple 'pass'
+                            statement for each executable, and subtracts
+                            that from each snippet's run time.
+    -s code,--setup code  : Setup code for timeit (same as timeit -s).
+                            Can be used multiple times.
+    -v,--version          : Show version and exit.
 ```
 
 Installation:
@@ -45,17 +52,17 @@ Usage Examples:
 
 Example of comparing two code snippets:
 ```
-timeitcomp "[str(c) for c in nums]" "map(str, nums)" -- -s "nums=range(5)"
+timeitcomp -s "nums=range(5)" "[str(c) for c in nums]" "map(str, nums)"
 ```
 
 Example of comparing two interpreters with the same snippet:
 ```
-timeitcomp -e=python -e=python3 "map(str, nums)" -- -s "nums=range(5)"
+timeitcomp -e=python -e=python3 -s "nums=range(5)" "map(str, nums)"
 ```
 
 Example of comparing two interpreters with two code snippets:
 ```
-timeitcomp -e=python -e=python3 "[str(c) for c in nums]" "map(str, nums)" -- -s "nums=range(5)"
+timeitcomp -e=python -e=python3 -s "nums=range(5)" "[str(c) for c in nums]" "map(str, nums)"
 ```
 
 Example of output:
