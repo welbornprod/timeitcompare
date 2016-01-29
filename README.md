@@ -8,8 +8,8 @@ Command Line Help:
 ------------------
 ```
 Usage:
-    timeitcomp.sh -h | -v
-    timeitcomp.sh [-e=executable...] [-o] [-s code...] [CODE...] [-- ARGS...]
+    timeitcomp -h | -v
+    timeitcomp [-e=executable...] [-o] [-s code...] [CODE...] [-- ARGS...]
 
 Options:
     CODE                  : One or more code snippets to compare.
