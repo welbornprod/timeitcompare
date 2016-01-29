@@ -15,14 +15,48 @@ else
     }
 fi
 
-appname="timeit-compare"
-appversion="0.2.3"
+appname="Timeit-Compare"
+appversion="0.3.0"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
 # Default python to use.
 default_exename="python3"
 
+
+function format_time {
+    # Format a float time (from timeit, or get_overhead), with Optional
+    # color codes.
+    local floatstr=$1
+    local colorname="${2:-magenta}"
+    colr "$(printf "%.3f" "$floatstr")" "$colorname"
+}
+
+function get_overhead {
+    # Get baseline/overhead time for this machine/exe by simply using 'pass'.
+    local exe=$1
+    local timeitoutput
+    timeitoutput="$("$exe" -m timeit)" || return 1
+    parse_runtime "$timeitoutput"
+}
+
+function get_overhead_diff {
+    # Subtract overhead from the final time.
+    local total=$1
+    local overhead=$2
+    if [[ -z "$total" ]] || [[ -z "$overhead" ]]; then
+        return 1
+    fi
+    echo "$total - $overhead" | bc
+}
+
+function parse_runtime {
+    # Parse the timeit output to extract just the time.
+    local timeitoutput=$1
+    local basetime
+    basetime="$(cut -d' ' -f6 <<<"$timeitoutput")" || return 1
+    printf "%s" "$basetime"
+}
 
 function print_usage {
     # Print a 'reason' for showing the usage.
@@ -32,7 +66,7 @@ function print_usage {
 
     Usage:${fore[lightmagenta]}
         $appscript -h | -v
-        $appscript [-e=executable...] [CODE...] [-- ARGS...]${style[reset]}"
+        $appscript [-e=executable...] [-o] [CODE...] [-- ARGS...]${style[reset]}"
     # Print full usage when no reason-arg is given.
     if [[ -z "$1" ]]; then
         echo "
@@ -48,6 +82,11 @@ function print_usage {
                             This flag can be set multiple times.
                             All code snippets will be used once per executable.
         -h,--help         : Show this message and exit.
+        -o,--overhead     : Account for some of the overhead of using timeit
+                            to run these snippets.
+                            Times the execution of a simple 'pass' statement
+                            for each executable, and subtracts that from
+                            each snippet's run time.
         -v,--version      : Show version and exit.
     ${style[reset]}"
     fi
@@ -72,6 +111,9 @@ function time_code {
     #     $2 : Code snippet.
     #     $3 : Optional display name for this snippet.
     #          Default: Trimmed code snippet text.
+    #     $4 : Optional overhead time to subtract from total.
+    local output
+    local runtime
     if [[ -n "$3" ]]; then
         echo "    Timing: $(colr "$3" "green")"
     else
@@ -81,7 +123,20 @@ function time_code {
         printf "        %s\n\n" "$(colr "$output" "red")" 1>&2
         return 1
     fi
-    printf "        %s\n\n" "$(colr "$output" "blue")"
+    runtime="$(parse_runtime "$output")"
+    printf "        %s" "$(colr "$output" "blue")"
+    if [[ -z "$4" ]]; then
+        # No overhead calculations.
+        echo -e "\n"
+    else
+        local realtime
+        if realtime="$(get_overhead_diff "$runtime" "$4")"; then
+            printf " (%s: %s)\n\n" "$(colr "actual" "blue")" "$(format_time "$realtime")"
+        else
+            # Failed to get real time.
+            echo -e "\n"
+        fi
+    fi
 }
 
 function trim_text {
@@ -101,6 +156,8 @@ declare -a snippets
 declare -a timeitargs
 force_stdin=0
 in_args=0
+use_overhead=0
+
 for arg
 do
     if (( in_args )); then
@@ -115,6 +172,8 @@ do
     elif [[ "$arg" =~ ^(-h)|(--help)$ ]]; then
         print_usage ""
         exit 0
+    elif [[ "$arg" =~ ^(-o)|(--overhead)$ ]]; then
+        use_overhead=1
     elif [[ "$arg" =~ ^(-v)|(--version)$ ]]; then
         echo -e "$appname v. $appversion\n"
         exit 0
@@ -143,6 +202,7 @@ done
 if (( ${#exenames[@]} == 0 )); then
     exenames=("$default_exename")
 fi
+
 do_stdin=$(( ${#snippets[@]} == 0 && ${#filenames[@]} == 0 ))
 # Use stdin if forced, or if no snippets or file names have been passed.
 if (( force_stdin || do_stdin )); then
@@ -162,17 +222,27 @@ do
     exenamefmt="$(colr "$exename" "red")"
     timeitargsfmt="$(colr "$(trim_text "${timeitargs[*]}")" "magenta")"
     printf "\nUsing: %s %s\n" "$exenamefmt" "$timeitargsfmt"
+    if ((use_overhead)); then
+        printf "  %s\n" "$(colr "...calculating overhead time." "green")"
+        if exeoverhead="$(get_overhead "$exename")"; then
+            printf "  Overhead: %s\n" "$(format_time "$exeoverhead" "blue")"
+        else
+            printf "  %s\n" "$(colr "Failed!" "red")"
+        fi
+    else
+        exeoverhead=""
+    fi
     # Read any files passed in.
     for fname in "${filenames[@]}"
     do
-        if ! time_code "$exename" "$(<"$fname")" "$fname"; then
+        if ! time_code "$exename" "$(<"$fname")" "$fname" "$exeoverhead"; then
             exit 1
         fi
     done
     # Use any snippets passed in.
     for code in "${snippets[@]}"
     do
-        if ! time_code "$exename" "$code"; then
+        if ! time_code "$exename" "$code" "" "$exeoverhead"; then
             exit 1
         fi
     done
