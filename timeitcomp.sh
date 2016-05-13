@@ -16,7 +16,7 @@ else
 fi
 
 appname="Timeit-Compare"
-appversion="0.3.1"
+appversion="0.3.2"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
@@ -111,13 +111,13 @@ function time_code {
     # Arguments:
     #     $1 : Executable name.
     #     $2 : Code snippet.
-    #     $3 : Optional display name for this snippet.
+    #     $3 : Optional display/file name for this snippet.
     #          Default: Trimmed code snippet text.
     #     $4 : Optional overhead time to subtract from total.
     local output
     local runtime
     if [[ -n "$3" ]]; then
-        echo "    Timing: $(colr "$3" "green")"
+        echo "    Timing: $(colr "$3" "cyan")"
     else
         echo "    Timing: $(colr "$(trim_text "$2")" "green")"
     fi
