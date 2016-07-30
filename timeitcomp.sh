@@ -16,7 +16,7 @@ else
 fi
 
 appname="Timeit-Compare"
-appversion="0.3.2"
+appversion="0.3.3"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
@@ -192,7 +192,7 @@ do
         if [[ -z "$exeargname" ]] || [[ "$exeargname" =~ ^(-e)|(--exe)$ ]]; then
             print_usage "Invalid executable arg: $arg\n    Expecting: -e=executable"
             exit 1
-        elif ! which "$exeargname" &>/dev/null; then
+        elif ! hash "$exeargname" &>/dev/null; then
             echo -e "\nNot a valid executable: $exeargname" 2>&1
             exit 1
         else
