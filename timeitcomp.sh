@@ -16,13 +16,43 @@ else
 fi
 
 appname="Timeit-Compare"
-appversion="0.3.3"
+appversion="0.4.0"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
 # Default python to use.
 default_exename="python3"
 
+function echo_err {
+    # Echo to stderr.
+    echo -e "$(colr "$*" "red")" 1>&2
+}
+
+function echo_lbl {
+    # Echo a formatted lbl: value pair to stdout.
+    local lbl=$1
+    shift
+    echo -e "$(colr "$lbl" "cyan"): $*"
+}
+
+function echo_lbl_err {
+    # Echo a formatted lbl: value pair to stderr.
+    local lbl=$1
+    shift
+    echo -e "$(colr "$lbl" "red"): $(colr "$*" "magenta")" 1>&2
+}
+
+function fail {
+    # Print a message to stderr and exit with an error status code.
+    echo_err "$@"
+    exit 1
+}
+
+function fail_usage {
+    # Print a usage failure message, and exit with an error status code.
+    print_usage "$@"
+    exit 1
+}
 
 function format_time {
     # Format a float time (from timeit, or get_overhead), with Optional
@@ -89,6 +119,8 @@ function print_usage {
                                 that from each snippet's run time.
         -s code,--setup code  : Setup code for timeit (same as timeit -s).
                                 Can be used multiple times.
+                                This can also be a file name to read setup
+                                code from.
         -v,--version          : Show version and exit.
     ${style[reset]}"
     fi
@@ -96,14 +128,24 @@ function print_usage {
 
 function read_stdin {
     # Read lines from stdin, echo them out so they can be used with $().
-    local saveifs="$IFS"
-    local line
+    local saveifs="$IFS" line
     IFS=$'\n'
     while read -r line
     do
         echo "$line"
     done
     IFS="$saveifs"
+}
+
+function read_setup {
+    # Read setup code form a file. Exits the program on error.
+    local filename=$1 setuplines=""
+    mapfile -t setuplines < "$filename"
+    if ((${#setuplines[@]} == 0)); then
+        echo_lbl_err "No setup code in" "$filename"
+        return 1
+    fi
+    printf "%s\n" "${setuplines[@]}"
 }
 
 function time_code {
@@ -142,11 +184,11 @@ function time_code {
 }
 
 function trim_text {
-    # Output the first line of some text (up to 40 characters).
+    # Output the first line of some text (up to maxwidth characters).
     # Add '...' if the text was trimmed.
-    local firstline="${1%%$'\n'*}"
-    if (( ${#firstline} > 40 )) || [[ "$1" != "$firstline" ]]; then
-        echo "${firstline:0:40} ..."
+    local firstline="${1%%$'\n'*}" maxwidth="${2:-40}"
+    if (( ${#firstline} > maxwidth )) || [[ "$1" != "$firstline" ]]; then
+        echo "${firstline:0:$maxwidth} ..."
     else
         echo "$firstline"
     fi
@@ -165,10 +207,21 @@ for arg
 do
     if (( in_args )); then
         # Build timeit args.
-        timeitargs=("${timeitargs[@]}" "$arg")
+        timeitargs+=("$arg")
+        timeitargs_display+=("$arg")
     elif (( in_setup )); then
         # -s flag was passed early, grab this for setup.
-        timeitargs=("${timeitargs[@]}" "$arg")
+        if [[ -e "$arg" ]]; then
+            # setup content was a file name, grab it's content.
+            echo_lbl "Reading setup code from" "$arg"
+            timeitargs_display+=("$arg")
+            if ! arg=$(read_setup "$arg"); then
+                exit 1
+            fi
+        else
+            timeitargs_display+=("$arg")
+        fi
+        timeitargs+=("$arg")
         in_setup=0
     elif [[ "$arg" == "--" ]]; then
         # All other args will be treated as timeit args.
@@ -182,7 +235,8 @@ do
     elif [[ "$arg" =~ ^(-o)|(--overhead)$ ]]; then
         use_overhead=1
     elif [[ "$arg" =~ ^(-s)|(--setup)$ ]]; then
-        timeitargs=("${timeitargs[@]}" "-s")
+        timeitargs+=("-s")
+        timeitargs_display+=("-s")
         in_setup=1
     elif [[ "$arg" =~ ^(-v)|(--version)$ ]]; then
         echo -e "$appname v. $appversion\n"
@@ -190,20 +244,21 @@ do
     elif [[ "$arg" =~ ^(-e)|(--exe)= ]]; then
         exeargname="${arg##*=}"
         if [[ -z "$exeargname" ]] || [[ "$exeargname" =~ ^(-e)|(--exe)$ ]]; then
-            print_usage "Invalid executable arg: $arg\n    Expecting: -e=executable"
+            echo_lbl_err "Invalid executable arg" "$arg"
+            echo_lbl_err "    Expecting" "-e=executable"
             exit 1
         elif ! hash "$exeargname" &>/dev/null; then
-            echo -e "\nNot a valid executable: $exeargname" 2>&1
+            echo_lbl_err "\nNot a valid executable" "$exeargname"
             exit 1
         else
-            exenames=("${exenames[@]}" "$exeargname")
+            exenames+=("$exeargname")
         fi
     else
         # Any non-flag arg before -- is a snippet of code or a filename.
         if [[ -e "$arg" ]]; then
-            filenames=("${filenames[@]}" "$arg")
+            filenames+=("$arg")
         else
-            snippets=("${snippets[@]}" "$arg")
+            snippets+=("$arg")
         fi
     fi
 done
@@ -220,8 +275,7 @@ if (( force_stdin || do_stdin )); then
     snippets=("${snippets[@]}" "$(read_stdin)")
     # Stdin may not have produced any valid snippets.
     if (( ${#snippets} == 0 )) && (( ${#filenames} == 0 )); then
-        print_usage "No code to test!"
-        exit 1
+        fail_usage "No code to test!"
     fi
 fi
 
@@ -230,7 +284,7 @@ fi
 for exename in "${exenames[@]}"
 do
     exenamefmt="$(colr "$exename" "red")"
-    timeitargsfmt="$(colr "$(trim_text "${timeitargs[*]}")" "magenta")"
+    timeitargsfmt="$(colr "$(trim_text "${timeitargs_display[*]}" "60")" "magenta")"
     printf "\nUsing: %s %s\n" "$exenamefmt" "$timeitargsfmt"
     if ((use_overhead)); then
         printf "  %s\n" "$(colr "...calculating overhead time." "green")"

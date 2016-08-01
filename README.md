@@ -8,8 +8,8 @@ Command Line Help:
 ------------------
 ```
 Usage:
-    timeitcomp -h | -v
-    timeitcomp [-e=executable...] [-o] [-s code...] [CODE...] [-- ARGS...]
+    timeitcomp.sh -h | -v
+    timeitcomp.sh [-e=executable...] [-o] [-s code...] [CODE...] [-- ARGS...]
 
 Options:
     CODE                  : One or more code snippets to compare.
@@ -30,6 +30,8 @@ Options:
                             that from each snippet's run time.
     -s code,--setup code  : Setup code for timeit (same as timeit -s).
                             Can be used multiple times.
+                            This can also be a file name to read setup
+                            code from.
     -v,--version          : Show version and exit.
 ```
 
@@ -86,10 +88,11 @@ Using: python3 -s nums=range(5)
 
 Examples of reading stdin/files:
 ```
-timeitcomp < snippet.py            # snippet.py is read and used.
-timeitcomp snippet.py snippet2.py  # both files used as separate snippets.
-echo "x=1" | timeitcomp            # stdin is used as a snippet.
-timeitcomp                         # stdin will be read and used (at least one line)
+timeitcomp < snippet.py              # snippet.py is read and used.
+timeitcomp -s setup.py < snippet.py  # setup code is read from setup.py, snippet.py is timed.
+timeitcomp snippet.py snippet2.py    # both files used as separate snippets.
+echo "x=1" | timeitcomp              # stdin is used as a snippet.
+timeitcomp                           # stdin will be read and used (at least one line)
 ```
 
 Example of mixing files, snippets, and stdin.
