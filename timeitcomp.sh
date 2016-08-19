@@ -16,7 +16,7 @@ else
 fi
 
 appname="Timeit-Compare"
-appversion="0.4.0"
+appversion="0.4.1"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appscript="${apppath##*/}"
 
