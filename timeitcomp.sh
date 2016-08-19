@@ -126,6 +126,19 @@ function print_usage {
     fi
 }
 
+function print_versions {
+    # Print app name and version, possibly with dependency versions.
+    echo "$appname v. $appversion"
+    # shellcheck disable=SC2154
+    # ..colr_app_name/version only available when colr.sh is sourced.
+    if [[ -n "$colr_app_name" && -n "$colr_app_version" ]]; then
+        local colrver
+        colrver="$(colr "$colr_app_name v. $colr_app_version" "blue")"
+        echo -e "    using $colrver"
+    fi
+    echo
+}
+
 function read_stdin {
     # Read lines from stdin, echo them out so they can be used with $().
     local saveifs="$IFS" line
@@ -239,7 +252,7 @@ do
         timeitargs_display+=("-s")
         in_setup=1
     elif [[ "$arg" =~ ^(-v)|(--version)$ ]]; then
-        echo -e "$appname v. $appversion\n"
+        print_versions
         exit 0
     elif [[ "$arg" =~ ^(-e)|(--exe)= ]]; then
         exeargname="${arg##*=}"
