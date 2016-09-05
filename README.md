@@ -46,7 +46,7 @@ Installation:
 -------------
 
 Just symlink `timeitcomp.sh` to somewhere in `$PATH`:
-```
+```bash
 cd timeitcompare
 ln -s "$PWD/timeitcomp.sh" ~/.local/bin/timeitcomp
 ```
@@ -60,17 +60,17 @@ Usage Examples:
 ---------------
 
 Example of comparing two code snippets:
-```
+```bash
 timeitcomp -s "nums=range(5)" "[str(c) for c in nums]" "map(str, nums)"
 ```
 
 Example of comparing two interpreters with the same snippet:
-```
+```bash
 timeitcomp -e=python -e=python3 -s "nums=range(5)" "map(str, nums)"
 ```
 
 Example of comparing two interpreters with two code snippets:
-```
+```bash
 timeitcomp -e=python -e=python3 -s "nums=range(5)" "[str(c) for c in nums]" "map(str, nums)"
 ```
 
@@ -103,9 +103,37 @@ timeitcomp                           # stdin will be read and used (at least one
 ```
 
 Example of mixing files, snippets, and stdin.
-```
+```bash
 echo "map(str, range(5))" | timeitcomp "(str(c) for c in range(5))" - snippet.py
 ```
+
+A contrived example to show `timeitcomp`'s colorized output:
+```bash
+timeitcomp -s "                      
+s = 'test this out'
+
+def with_split(text):
+    return ''.join(
+        c for word in text.split()
+        for c in word
+    )
+
+def with_ne(text):
+    return ''.join(
+        c for c in text
+        if c != ' '
+    )
+
+def with_replace(text):
+    return text.replace(' ', '')
+" "with_split(s)" "with_ne(s)" "with_replace(s)" -e=python -e=python3 -o
+```
+
+Output:
+![TimeitCompare Colorized Output](https://welbornprod.com/dl/static/media/img/timeitcomp-colorized-output.png)
+
+Colors are automatically disabled when piping output, but
+can be forced on or off with `--color` and `--nocolor`.
 
 Notes:
 ------
