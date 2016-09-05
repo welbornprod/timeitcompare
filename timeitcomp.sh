@@ -4,8 +4,11 @@
 # It will also do a single timeit run.
 
 # -Christopher Welborn 07-05-2015
+appname="Timeit-Compare"
+appversion="0.5.0"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appdir="${apppath%/*}"
+appscript="${apppath##*/}"
 
 if [[ -f "$appdir/colr.sh" ]]; then
     source "$appdir/colr.sh"
@@ -15,16 +18,19 @@ else
     }
 fi
 
-appname="Timeit-Compare"
-appversion="0.4.1"
-apppath="$(readlink -f "${BASH_SOURCE[0]}")"
-appscript="${apppath##*/}"
+# Default python to use, in their preferred order.
+default_exename=""
+declare -a python_exes=("python3" "python2" "python")
+for try_py_exe in "${python_exes[@]}"; do
+    if hash "$try_py_exe" &>/dev/null; then
+        default_exename="$try_py_exe"
+        break
+    fi
+done
 
-# Default python to use.
-default_exename="python3"
 
 function echo_err {
-    # Echo to stderr.
+    # Echo to stderr, with color.
     echo -e "$(colr "$*" "red")" 1>&2
 }
 
@@ -52,6 +58,11 @@ function fail_usage {
     # Print a usage failure message, and exit with an error status code.
     print_usage "$@"
     exit 1
+}
+
+function first_line {
+    # Get the first non-blank line from some text.
+    awk '/./ { print; exit}' <<<"$1"
 }
 
 function format_time {
@@ -91,12 +102,13 @@ function parse_runtime {
 function print_usage {
     # Print a 'reason' for showing the usage.
     [[ -n "$1" ]] && echo -e "\n$1\n"
+    # Flags already used by timiet: -c -h -n -p -r -s -t -u -v
     # shellcheck disable=SC2154
     echo "${fore[lightblue]}${style[bright]}$appname v. $appversion${style[reset]}
 
     Usage:${fore[lightmagenta]}
         $appscript -h | -v
-        $appscript [-e=executable...] [-o] [-s code...] [CODE...] [-- ARGS...]${style[reset]}"
+        $appscript [-e=exe...] [-s code...] [CODE...] [options] [-- ARGS...]${style[reset]}"
     # Print full usage when no reason-arg is given.
     if [[ -z "$1" ]]; then
         echo "
@@ -107,11 +119,13 @@ function print_usage {
                                 Default: stdin
         ARGS                  : Extra arguments for timeit.
                                 Must be last, and come after the -- separator.
+        -C,--color            : Use colors, even when piping output.
         -e=exe,--exe=exe      : Executable to use. This flag can be set
                                 multiple times. All code snippets will be used
                                 once per executable.
                                 Default: $default_exename
         -h,--help             : Show this message and exit.
+        -N,--nocolor          : Disable colors.
         -o,--overhead         : Account for some of the overhead of using
                                 timeit to run these snippets.
                                 Times the execution of a simple 'pass'
@@ -137,6 +151,13 @@ function print_versions {
         echo -e "    using $colrver"
     fi
     echo
+}
+
+function printf_err {
+    # Printf, to stderr.
+    # shellcheck disable=SC2059
+    # ...using vars in printf on purpose.
+    colr "$(printf "$@")" "red" 1>&2
 }
 
 function read_stdin {
@@ -199,23 +220,26 @@ function time_code {
 function trim_text {
     # Output the first line of some text (up to maxwidth characters).
     # Add '...' if the text was trimmed.
-    local firstline="${1%%$'\n'*}" maxwidth="${2:-40}"
+    local firstline
+    firstline="$(first_line "$1")"
+    local maxwidth="${2:-40}"
     if (( ${#firstline} > maxwidth )) || [[ "$1" != "$firstline" ]]; then
-        echo "${firstline:0:$maxwidth} ..."
+        # Either the first line is too long, or it was multiline.
+        printf "%s ..." "${firstline:0:$maxwidth}"
     else
-        echo "$firstline"
+        printf "%s" "$firstline"
     fi
 }
 
 declare -a exenames
 declare -a filenames
 declare -a snippets
-declare -a timeitargs
+declare -a timeitargs timeitargs_display
 force_stdin=0
 use_overhead=0
 in_args=0
 in_setup=0
-
+auto_disable_colors=1
 for arg
 do
     if (( in_args )); then
@@ -227,12 +251,12 @@ do
         if [[ -e "$arg" ]]; then
             # setup content was a file name, grab it's content.
             echo_lbl "Reading setup code from" "$arg"
-            timeitargs_display+=("$arg")
+            timeitargs_display+=("$(trim_text "$arg" 60)")
             if ! arg=$(read_setup "$arg"); then
                 exit 1
             fi
         else
-            timeitargs_display+=("$arg")
+            timeitargs_display+=("$(trim_text "$arg" 60)")
         fi
         timeitargs+=("$arg")
         in_setup=0
@@ -242,9 +266,13 @@ do
     elif [[ "$arg" == "-" ]]; then
         # Stdin will be used.
         force_stdin=1
+    elif [[ "$arg" =~ ^(-C)|(--color)$ ]]; then
+        auto_disable_colors=0
     elif [[ "$arg" =~ ^(-h)|(--help)$ ]]; then
         print_usage ""
         exit 0
+    elif [[ "$arg" =~ ^(-N)|(--nocolor)$ ]]; then
+        colr_disable
     elif [[ "$arg" =~ ^(-o)|(--overhead)$ ]]; then
         use_overhead=1
     elif [[ "$arg" =~ ^(-s)|(--setup)$ ]]; then
@@ -275,12 +303,20 @@ do
         fi
     fi
 done
+# Automatically disable colors for stdout and stderr.
+((auto_disable_colors)) && colr_auto_disable 1 2
 
 # Ensure at least one executable, and one code snippet.
 if (( ${#exenames[@]} == 0 )); then
+    if [[ -z "$default_exename" ]]; then
+        echo_err "Cannot find any of the default python executables:"
+        echo_err "$(printf "    %s\n" "${python_exes[@]}")"
+        fail "\nYou can specify one with the -e flag."
+    fi
     exenames=("$default_exename")
 fi
 
+# With no snippets or file names, stdin will be used.
 do_stdin=$(( ${#snippets[@]} == 0 && ${#filenames[@]} == 0 ))
 # Use stdin if forced, or if no snippets or file names have been passed.
 if (( force_stdin || do_stdin )); then
@@ -297,14 +333,14 @@ fi
 for exename in "${exenames[@]}"
 do
     exenamefmt="$(colr "$exename" "red")"
-    timeitargsfmt="$(colr "$(trim_text "${timeitargs_display[*]}" "60")" "magenta")"
+    timeitargsfmt="$(colr "${timeitargs_display[*]}" "magenta")"
     printf "\nUsing: %s %s\n" "$exenamefmt" "$timeitargsfmt"
     if ((use_overhead)); then
         printf "  %s\n" "$(colr "...calculating overhead time." "green")"
         if exeoverhead="$(get_overhead "$exename")"; then
             printf "  Overhead: %s\n" "$(format_time "$exeoverhead" "blue")"
         else
-            printf "  %s\n" "$(colr "Failed!" "red")"
+            printf_err "  %s\n" "Failed!"
         fi
     else
         exeoverhead=""

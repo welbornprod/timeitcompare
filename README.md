@@ -2,14 +2,19 @@ timeit-compare
 ==============
 
 A small bash script that makes it easy to compare python code snippets using
-the `timeit` module.
+the `timeit` module. The snippets share the same setup code (when provided),
+which reduces the amount of typing needed to compare multiple snippets.
+
+It helps to answer the question "Which of these runs faster on my machine?",
+where `timeit` is designed to answer the question "How fast does this run
+on my machine?".
 
 Command Line Help:
 ------------------
 ```
 Usage:
     timeitcomp.sh -h | -v
-    timeitcomp.sh [-e=executable...] [-o] [-s code...] [CODE...] [-- ARGS...]
+    timeitcomp.sh [-e=exe...] [-s code...] [CODE...] [options] [-- ARGS...]
 
 Options:
     CODE                  : One or more code snippets to compare.
@@ -18,11 +23,13 @@ Options:
                             Default: stdin
     ARGS                  : Extra arguments for timeit.
                             Must be last, and come after the -- separator.
+    -C,--color            : Use colors, even when piping output.
     -e=exe,--exe=exe      : Executable to use. This flag can be set
                             multiple times. All code snippets will be used
                             once per executable.
                             Default: python3
     -h,--help             : Show this message and exit.
+    -N,--nocolor          : Disable colors.
     -o,--overhead         : Account for some of the overhead of using
                             timeit to run these snippets.
                             Times the execution of a simple 'pass'
