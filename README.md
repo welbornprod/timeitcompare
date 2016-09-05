@@ -130,6 +130,7 @@ def with_replace(text):
 ```
 
 Output:
+
 ![TimeitCompare Colorized Output](https://welbornprod.com/dl/static/media/img/timeitcomp-colorized-output.png)
 
 Colors are automatically disabled when piping output, but
