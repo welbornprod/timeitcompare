@@ -5,12 +5,13 @@
 
 # -Christopher Welborn 07-05-2015
 appname="Timeit-Compare"
-appversion="0.5.0"
+appversion="0.5.1"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appdir="${apppath%/*}"
 appscript="${apppath##*/}"
 
 if [[ -f "$appdir/colr.sh" ]]; then
+    # shellcheck source=/home/cj/scripts/bash/timeitcompare/colr.sh
     source "$appdir/colr.sh"
 else
     function colr {
@@ -63,6 +64,33 @@ function fail_usage {
 function first_line {
     # Get the first non-blank line from some text.
     awk '/./ { print; exit}' <<<"$1"
+}
+
+function format_code {
+    # Formats code for terminal printing.
+    # Uses 'highlight' if available, then 'pygmentz', then 'ccat'.
+    # If no highlighting program is available, it is simply colorized with
+    # colr.sh.
+    # Arguments:
+    #   $1 : The code snippet to highlight.
+    [[ -n "$1" ]] || {
+        echo_err "No code given for format_code."
+        return 1
+    }
+    colr_is_disabled && {
+        # No highlighting when color is disabled.
+        printf "%s" "$1"
+        return 0
+    }
+    if hash highlight &>/dev/null; then
+        highlight --style=molokai --syntax=python --out-format=xterm256 <<<"$1"
+    elif hash pygmentize &>/dev/null; then
+        pygmentize -l python3 -f terminal256 -O 'style=monokai' <<<"$1"
+    elif hash ccat &>/dev/null; then
+        ccat -c -s monokai -l python3 <<<"$1"
+    else
+        colr "$1" "green"
+    fi
 }
 
 function format_time {
@@ -195,7 +223,7 @@ function time_code {
     if [[ -n "$3" ]]; then
         echo "    Timing: $(colr "$3" "cyan")"
     else
-        echo "    Timing: $(colr "$(trim_text "$2")" "green")"
+        echo "    Timing: $(format_code "$(trim_text "$2")")"
     fi
     if ! output="$("$1" -m timeit "${timeitargs[@]}" -- "$2" 2>&1)"; then
         printf "        %s\n\n" "$(colr "$output" "red")" 1>&2
@@ -231,6 +259,15 @@ function trim_text {
     fi
 }
 
+function use_colors {
+    # Determines whether color should be used, before or during regular arg
+    # parsing. Must be given script arguments to help decide.
+    [[ "$*" =~ (-C)|(--color) ]] && return 0
+    [[ "$*" =~ (-N)|(--nocolor) ]] && return 1
+    [[ -t 1 ]] && return 0
+    return 1
+}
+
 declare -a exenames
 declare -a filenames
 declare -a snippets
@@ -240,8 +277,7 @@ use_overhead=0
 in_args=0
 in_setup=0
 auto_disable_colors=1
-for arg
-do
+for arg; do
     if (( in_args )); then
         # Build timeit args.
         timeitargs+=("$arg")
@@ -249,14 +285,20 @@ do
     elif (( in_setup )); then
         # -s flag was passed early, grab this for setup.
         if [[ -e "$arg" ]]; then
-            # setup content was a file name, grab it's content.
+            # Setup content was a file name, grab it's content.
             echo_lbl "Reading setup code from" "$arg"
             timeitargs_display+=("$(trim_text "$arg" 60)")
             if ! arg=$(read_setup "$arg"); then
                 exit 1
             fi
         else
-            timeitargs_display+=("$(trim_text "$arg" 60)")
+            # Setup content was a code snippet.
+            if use_colors "$@"; then
+                timeitargs_display+=("$(format_code "$(trim_text "$arg" 60)")")
+            else
+                # No highlighting for setup snippet.
+                timeitargs_display+=("$(trim_text "$arg" 60)")
+            fi
         fi
         timeitargs+=("$arg")
         in_setup=0
@@ -330,8 +372,7 @@ fi
 
 
 # Run timeit for each snippet, once per executable.
-for exename in "${exenames[@]}"
-do
+for exename in "${exenames[@]}"; do
     exenamefmt="$(colr "$exename" "red")"
     timeitargsfmt="$(colr "${timeitargs_display[*]}" "magenta")"
     printf "\nUsing: %s %s\n" "$exenamefmt" "$timeitargsfmt"
@@ -346,15 +387,13 @@ do
         exeoverhead=""
     fi
     # Read any files passed in.
-    for fname in "${filenames[@]}"
-    do
+    for fname in "${filenames[@]}"; do
         if ! time_code "$exename" "$(<"$fname")" "$fname" "$exeoverhead"; then
             exit 1
         fi
     done
     # Use any snippets passed in.
-    for code in "${snippets[@]}"
-    do
+    for code in "${snippets[@]}"; do
         if ! time_code "$exename" "$code" "" "$exeoverhead"; then
             exit 1
         fi
