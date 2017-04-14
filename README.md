@@ -109,7 +109,7 @@ echo "map(str, range(5))" | timeitcomp "(str(c) for c in range(5))" - snippet.py
 
 A contrived example to show `timeitcomp`'s colorized output:
 ```bash
-timeitcomp -s "                      
+timeitcomp -s "
 s = 'test this out'
 
 def with_split(text):
@@ -131,7 +131,7 @@ def with_replace(text):
 
 Output:
 
-![TimeitCompare Colorized Output](https://welbornprod.com/dl/static/media/img/timeitcomp-colorized-output.png)
+![TimeitCompare Colorized Output](https://welbornprod.com/static/media/img/timeitcomp-colorized-output_HKXmpn0.png)
 
 Colors are automatically disabled when piping output, but
 can be forced on or off with `--color` and `--nocolor`.

@@ -63,7 +63,7 @@ function fail_usage {
 
 function first_line {
     # Get the first non-blank line from some text.
-    awk '/./ { print; exit}' <<<"$1"
+    awk '/\w/ { print; exit}' <<<"$1"
 }
 
 function format_code {
