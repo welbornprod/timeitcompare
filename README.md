@@ -24,9 +24,10 @@ Options:
     ARGS                  : Extra arguments for timeit.
                             Must be last, and come after the -- separator.
     -C,--color            : Use colors, even when piping output.
-    -e=exe,--exe=exe      : Executable to use. This flag can be set
-                            multiple times. All code snippets will be used
-                            once per executable.
+    -e=exe,--exe=exe      : Python interpreter executable to use.
+                            This flag can be set multiple times.
+                            All code snippets will be used once per
+                            executable.
                             Default: python3
     -h,--help             : Show this message and exit.
     -N,--nocolor          : Disable colors.

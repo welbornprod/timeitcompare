@@ -5,7 +5,7 @@
 
 # -Christopher Welborn 07-05-2015
 appname="Timeit-Compare"
-appversion="0.5.1"
+appversion="0.5.2"
 apppath="$(readlink -f "${BASH_SOURCE[0]}")"
 appdir="${apppath%/*}"
 appscript="${apppath##*/}"
@@ -148,9 +148,10 @@ function print_usage {
         ARGS                  : Extra arguments for timeit.
                                 Must be last, and come after the -- separator.
         -C,--color            : Use colors, even when piping output.
-        -e=exe,--exe=exe      : Executable to use. This flag can be set
-                                multiple times. All code snippets will be used
-                                once per executable.
+        -e=exe,--exe=exe      : Python interpreter executable to use.
+                                This flag can be set multiple times.
+                                All code snippets will be used once per
+                                executable.
                                 Default: $default_exename
         -h,--help             : Show this message and exit.
         -N,--nocolor          : Disable colors.
